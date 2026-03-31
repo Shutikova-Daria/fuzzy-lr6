@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Lab 6 </title>
+<style>
+body {
+    background: #0d1117;
+    color: #cdd9e5;
+    font-family: 'Segoe UI', sans-serif;
+    text-align: center;
+    padding: 30px;
+}
+
+h2 {
+    margin-bottom: 20px;
+}
+
+.container {
+    background: #131a22;
+    border: 1px solid #1e2d3d;
+    border-radius: 12px;
+    padding: 20px;
+    display: inline-block;
+}
+
+input, select {
+    background: #0a0f15;
+    border: 1px solid #1e2d3d;
+    color: #cdd9e5;
+    padding: 6px;
+    border-radius: 6px;
+    margin: 5px;
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #38bdf8;
+}
+
+button {
+    background: #38bdf8;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+button:hover {
+    background: #0ea5e9;
+}
+
+#graph {
+    margin-top: 20px;
+    border: 1px solid #1e2d3d;
+    border-radius: 10px;
+    padding: 10px;
+}
+</style>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+function round(x){ return Math.round(x*100)/100; }
+
+function trapezoid(x,a,b,c,d){
+    if(x<=a || x>=d) return 0;
+    if(x>=b && x<=c) return 1;
+    if(x>a && x<b) return (x-a)/(b-a);
+    return (d-x)/(d-c);
+}
+
+function bell(x,a,b,c){
+    return 1/(1+Math.pow(Math.abs((x-c)/a),2*b));
+}
+
+function sigmoid(x,a1,c1,a2,c2){
+    return (1/(1+Math.exp(-a1*(x-c1))))*
+           (1/(1+Math.exp(-a2*(x-c2))));
+}
+
+function tabulate(len, params, type){
+    let values={};
+    let min=params.b-5*params.d;
+    let max=params.b+5*params.d;
+    let step=(max-min)/len;
+
+    for(let i=0;i<len;i++){
+        let x=min+step*i;
+        let mu=0;
+
+        if(type==="trapezoid"){
+            mu=trapezoid(x,params.a,params.b,params.c,params.d);
+        }
+        else if(type==="bell"){
+            mu=bell(x,params.a,params.b,params.c);
+        }
+        else if(type==="sigmoid"){
+            mu=sigmoid(x,params.a1,params.c1,params.a2,params.c2);
+        }
+
+        values[x]=mu;
+    }
+    return values;
+}
+
+let A,B,R;
+
+function calc(){
+    let Ab=+$("#a_b").val();
+    let Ad=+$("#a_d").val();
+    let Bb=+$("#b_b").val();
+    let Bd=+$("#b_d").val();
+    let len=+$("#length").val();
+
+    let typeA=$("#typeA").val();
+    let typeB=$("#typeB").val();
+
+    let paramsA={
+        a:Ab-Ad, b:Ab, c:Ab, d:Ab+Ad,
+        a1:1, c1:Ab-Ad, a2:-1, c2:Ab+Ad
+    };
+
+    let paramsB={
+        a:Bb-Bd, b:Bb, c:Bb, d:Bb+Bd,
+        a1:1, c1:Bb-Bd, a2:-1, c2:Bb+Bd
+    };
+
+    A=tabulate(len,paramsA,typeA);
+    B=tabulate(len,paramsB,typeB);
+    R={};
+
+    let op=$("#operation").val();
+
+    let operation={
+        add:(x,y)=>x+y,
+        minus:(x,y)=>x-y,
+        mult:(x,y)=>x*y,
+        divide:(x,y)=>x/y,
+        min:Math.min,
+        max:Math.max
+    };
+
+    for(let Ax in A){
+        for(let Bx in B){
+            let Rx=operation[op](+Ax,+Bx);
+            let mu=Math.min(A[Ax],B[Bx]);
+
+            R[Rx]=R[Rx]?Math.max(R[Rx],mu):mu;
+        }
+    }
+
+    draw();
+}
+
+function draw(){
+    let canvas=document.createElement("canvas");
+    let ctx=canvas.getContext("2d");
+
+    canvas.width=800;
+    canvas.height=300;
+
+    let min=Math.min(...Object.keys(R).map(Number));
+    let max=Math.max(...Object.keys(R).map(Number));
+
+    let scale=(canvas.width-40)/(max-min);
+
+    function drawSet(G,color){
+        ctx.strokeStyle=color;
+        ctx.beginPath();
+
+        let xs=Object.keys(G).map(Number).sort((a,b)=>a-b);
+
+        xs.forEach((x,i)=>{
+            let px=(x-min)*scale+20;
+            let py=canvas.height-20-G[x]*(canvas.height-40);
+
+            if(i===0) ctx.moveTo(px,py);
+            else ctx.lineTo(px,py);
+        });
+
+        ctx.stroke();
+    }
+
+    drawSet(A,"red");
+    drawSet(B,"green");
+    drawSet(R,"blue");
+
+    let img=canvas.toDataURL();
+    $("#graph").html('<img src="'+img+'">');
+}
+</script>
+</head>
+
+<body>
+
+<h2>Нечіткі числа</h2>
+
+A: b <input id="a_b" type="number" value="10">
+d <input id="a_d" type="number" value="2">
+
+Тип:
+<select id="typeA">
+<option value="trapezoid">Trapezoid</option>
+<option value="bell">Bell</option>
+<option value="sigmoid">Sigmoid</option>
+</select>
+
+<br><br>
+
+B: b <input id="b_b" type="number" value="5">
+d <input id="b_d" type="number" value="2">
+
+Тип:
+<select id="typeB">
+<option value="trapezoid">Trapezoid</option>
+<option value="bell">Bell</option>
+<option value="sigmoid">Sigmoid</option>
+</select>
+
+<br><br>
+
+Операція:
+<select id="operation">
+<option value="add">+</option>
+<option value="minus">-</option>
+<option value="mult">*</option>
+<option value="divide">/</option>
+<option value="min">min</option>
+<option value="max">max</option>
+</select>
+
+<br><br>
+
+Кроки:
+<input id="length" type="number" value="30">
+
+<br><br>
+
+<button onclick="calc()">Розрахувати</button>
+
+<div id="graph"></div>
+
+</body>
+</html>
